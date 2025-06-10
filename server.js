@@ -1,10 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const twilio = require('twilio');
+const MessagingResponse = twilio.twiml.MessagingResponse;
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Base de données produits populaires
 const PRODUCTS = {
