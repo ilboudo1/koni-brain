@@ -122,28 +122,35 @@ function extractCommande(message) {
 }
 
 // Fonction pour générer la voix avec ElevenLabs
+// REMPLACEZ votre generateVoice par cette version optimisée :
+
 async function generateVoice(text) {
   try {
     console.log('[AYAH Voix] Génération audio pour:', text.substring(0, 50) + '...');
     
-    // Utiliser une voix française naturelle
-    const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel - voix française
+    // LIMITER LE TEXTE pour économiser le quota gratuit
+    const texteLimite = text.substring(0, 150); // Maximum 150 caractères
+    
+    // Utiliser une voix plus simple
+    const voiceId = "21m00Tcm4TlvDq8ikWAM"; // Rachel - voix de base
+    
+    // Attendre un peu entre les requêtes (anti-spam)
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 seconde
     
     const options = {
       method: 'POST',
       headers: {
         'xi-api-key': process.env.ELEVENLABS_API_KEY,
         'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg'
+        'Accept': 'audio/mpeg',
+        'User-Agent': 'KONI-Markets/1.0' // Identifier notre app
       },
       body: JSON.stringify({
-        text: text,
-        model_id: "eleven_multilingual_v2",
+        text: texteLimite,
+        model_id: "eleven_monolingual_v1", // Modèle plus simple
         voice_settings: {
-          stability: 0.6,
-          similarity_boost: 0.8,
-          style: 0.4,
-          use_speaker_boost: true
+          stability: 0.5,
+          similarity_boost: 0.5
         }
       })
     };
@@ -153,6 +160,12 @@ async function generateVoice(text) {
     if (!response.ok) {
       const error = await response.text();
       console.error('[AYAH Voix] Erreur ElevenLabs:', error);
+      
+      // Si quota dépassé ou erreur, retourner null sans crash
+      if (error.includes('quota') || error.includes('limit')) {
+        console.log('[AYAH Voix] Quota ElevenLabs dépassé - Mode texte uniquement');
+      }
+      
       return null;
     }
     
@@ -167,7 +180,7 @@ async function generateVoice(text) {
     // Retourner l'URL publique
     const audioUrl = `https://koni-brain.onrender.com/audio/${filename}`;
     
-    // Nettoyer les vieux fichiers après 1 heure
+    // Nettoyer après 30 minutes (pas 1h pour économiser l'espace)
     setTimeout(() => {
       try {
         fs.unlinkSync(filepath);
@@ -175,15 +188,15 @@ async function generateVoice(text) {
       } catch (err) {
         // Ignorer si déjà supprimé
       }
-    }, 3600000); // 1 heure
+    }, 1800000); // 30 minutes
     
     return audioUrl;
     
-    } catch (error) {
+  } catch (error) {
     console.error('[AYAH Voix] Erreur:', error);
     return null;
   }
-  }
+}
 
 // AJOUTEZ CETTE ROUTE JUSTE AVANT app.listen
 
