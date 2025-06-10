@@ -124,36 +124,71 @@ function extractCommande(message) {
 // Fonction pour générer la voix avec ElevenLabs
 // REMPLACEZ votre generateVoice par cette version optimisée :
 
+// Version optimisée de generateVoice pour le plan Starter
+
 async function generateVoice(text) {
   try {
-    console.log('[AYAH Voix] Génération audio pour:', text.substring(0, 50) + '...');
+    console.log('[AYAH Voix] Génération audio (Plan Starter)...');
     
-    // LIMITER LE TEXTE pour économiser le quota gratuit
-    const texteLimite = text.substring(0, 150); // Maximum 150 caractères
+    // Avec 30,000 caractères/mois, on peut être plus généreux
+    const texteLimite = text.substring(0, 300); // 300 caractères au lieu de 150
     
-    // Utiliser une voix plus simple
-    const voiceId = "21m00Tcm4TlvDq8ikWAM"; // Rachel - voix de base
-    
-    // Attendre un peu entre les requêtes (anti-spam)
-    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 seconde
+    // Voix française de qualité
+    const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel - excellente voix française
     
     const options = {
       method: 'POST',
       headers: {
         'xi-api-key': process.env.ELEVENLABS_API_KEY,
         'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg',
-        'User-Agent': 'KONI-Markets/1.0' // Identifier notre app
+        'Accept': 'audio/mpeg'
       },
       body: JSON.stringify({
         text: texteLimite,
-        model_id: "eleven_monolingual_v1", // Modèle plus simple
+        model_id: "eleven_multilingual_v2", // Meilleur modèle avec le plan payant
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5
+          stability: 0.7,        // Plus stable
+          similarity_boost: 0.8, // Voix plus naturelle
+          style: 0.5,
+          use_speaker_boost: true
         }
       })
     };
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, options);
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[AYAH Voix] Erreur:', error);
+      return null;
+    }
+    
+    console.log('[AYAH Voix] Audio généré avec succès !');
+    
+    const audioBuffer = await response.buffer();
+    const filename = `ayah_${Date.now()}.mp3`;
+    const filepath = path.join(audioDir, filename);
+    
+    fs.writeFileSync(filepath, audioBuffer);
+    
+    const audioUrl = `https://koni-brain.onrender.com/audio/${filename}`;
+    
+    // Nettoyer après 1 heure
+    setTimeout(() => {
+      try {
+        fs.unlinkSync(filepath);
+      } catch (err) {
+        // Ignorer
+      }
+    }, 3600000);
+    
+    return audioUrl;
+    
+  } catch (error) {
+    console.error('[AYAH Voix] Erreur:', error);
+    return null;
+  }
+}
     
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, options);
     
