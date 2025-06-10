@@ -4,10 +4,22 @@ require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const twilio = require('twilio');
 const MessagingResponse = twilio.twiml.MessagingResponse;
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Créer un dossier pour les audios
+const audioDir = path.join(__dirname, 'public', 'audio');
+if (!fs.existsSync(audioDir)) {
+  fs.mkdirSync(audioDir, { recursive: true });
+}
+
+// Servir les fichiers statiques
+app.use('/audio', express.static(path.join(__dirname, 'public', 'audio')));
 
 // Configuration Gemini pour AYAH
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -108,6 +120,103 @@ function extractCommande(message) {
   
   return commandes;
 }
+
+// Fonction pour générer la voix avec ElevenLabs
+async function generateVoice(text) {
+  try {
+    console.log('[AYAH Voix] Génération audio pour:', text.substring(0, 50) + '...');
+    
+    // Utiliser une voix française naturelle
+    const voiceId = "onwK4e9ZLuTAKqWW03F9"; // Daniel - voix française
+    
+    const options = {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg'
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: 0.6,
+          similarity_boost: 0.8,
+          style: 0.4,
+          use_speaker_boost: true
+        }
+      })
+    };
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, options);
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[AYAH Voix] Erreur ElevenLabs:', error);
+      return null;
+    }
+    
+    // Sauvegarder l'audio
+    const audioBuffer = await response.buffer();
+    const filename = `ayah_${Date.now()}.mp3`;
+    const filepath = path.join(audioDir, filename);
+    
+    fs.writeFileSync(filepath, audioBuffer);
+    console.log('[AYAH Voix] Audio sauvegardé:', filename);
+    
+    // Retourner l'URL publique
+    const audioUrl = `https://koni-brain.onrender.com/audio/${filename}`;
+    
+    // Nettoyer les vieux fichiers après 1 heure
+    setTimeout(() => {
+      try {
+        fs.unlinkSync(filepath);
+        console.log('[AYAH Voix] Audio supprimé:', filename);
+      } catch (err) {
+        // Ignorer si déjà supprimé
+      }
+    }, 3600000); // 1 heure
+    
+    return audioUrl;
+    
+  } catch (error) {
+    console.error('[AYAH Voix] Erreur:', error);
+    return null;
+  }
+}
+
+// AJOUTEZ CETTE ROUTE JUSTE AVANT app.listen
+
+app.get('/test-voice', async (req, res) => {
+  try {
+    const testText = "Yam Waya! Je suis AYAH, ton assistante de KONI Markets. C'est doux dèh!";
+    
+    console.log('Test ElevenLabs - Clé présente:', !!process.env.ELEVENLABS_API_KEY);
+    
+    const audioUrl = await generateVoice(testText);
+    
+    if (audioUrl) {
+      res.json({
+        success: true,
+        text: testText,
+        audioUrl: audioUrl,
+        message: "Audio généré avec succès ! Cliquez sur audioUrl pour écouter."
+      });
+    } else {
+      res.json({
+        success: false,
+        error: "Impossible de générer l'audio",
+        keyPresent: !!process.env.ELEVENLABS_API_KEY
+      });
+    }
+    
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 // Base de données produits populaires
 const PRODUCTS = {
   'iphone 15': {
@@ -271,15 +380,34 @@ Exemple: "Je veux 2kg de tomates"`);
     }
     // AYAH prend le relais pour tout le reste !
     else {
-      // Utiliser AYAH pour toutes les autres interactions
-      const responseAYAH = await askAYAH(Body, From);
-      
-      // Si AYAH détecte une commande, l'ajouter au panier
-      const commandes = extractCommande(Body);
-      if (commandes.length > 0) {
-        const conversation = getConversation(From);
-        conversation.panier.push(...commandes);
-      }
+  // Obtenir la réponse texte d'AYAH
+  const responseAYAH = await askAYAH(Body, From);
+  
+  // NOUVEAU : Essayer de générer l'audio
+  const audioUrl = await generateVoice(responseAYAH);
+  
+  if (audioUrl) {
+    // Envoyer le texte ET l'audio
+    twiml.message(responseAYAH); // Le texte d'abord
+    
+    // Puis l'audio
+    const audioMsg = twiml.message("🔊 Message vocal d'AYAH :");
+    audioMsg.media(audioUrl);
+    
+    console.log('[AYAH] Réponse avec voix envoyée !');
+  } else {
+    // Si problème avec l'audio, envoyer juste le texte
+    twiml.message(responseAYAH);
+    console.log('[AYAH] Réponse texte seulement (audio failed)');
+  }
+  
+  // Gérer le panier si commande détectée
+  const commandes = extractCommande(Body);
+  if (commandes.length > 0) {
+    const conversation = getConversation(From);
+    conversation.panier.push(...commandes);
+  }
+}
       
       twiml.message(responseAYAH);
     }
