@@ -99,6 +99,10 @@ app.get('/', (req, res) => {
 
 // Démarrage serveur
 const PORT = process.env.PORT || 3000;
+app.post('/whatsapp', (req, res) => {
+  console.log('WhatsApp message reçu:', req.body);
+  res.status(200).send('OK');
+});
 app.listen(PORT, () => {
   console.log(`🚀 KONI Brain démarré sur port ${PORT}`);
   console.log(`📱 API Chat: POST /api/chat`);
