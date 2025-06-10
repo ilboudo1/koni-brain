@@ -32,7 +32,7 @@ function getConversation(phoneNumber) {
 async function askAYAH(message, phoneNumber) {
   try {
     const conversation = getConversation(phoneNumber);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     // Ajouter le message à l'historique
     conversation.messages.push({ role: 'user', content: message });
