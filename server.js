@@ -179,11 +179,11 @@ async function generateVoice(text) {
     
     return audioUrl;
     
-  } catch (error) {
+    } catch (error) {
     console.error('[AYAH Voix] Erreur:', error);
     return null;
   }
-}
+  }
 
 // AJOUTEZ CETTE ROUTE JUSTE AVANT app.listen
 
@@ -408,9 +408,7 @@ Exemple: "Je veux 2kg de tomates"`);
     conversation.panier.push(...commandes);
   }
 }
-      
-      twiml.message(responseAYAH);
-    }
+  
     
     res.type('text/xml');
     res.send(twiml.toString());
